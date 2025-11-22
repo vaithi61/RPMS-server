@@ -3,6 +3,7 @@ import Paper from '../models/Paper.js';
 import User from '../models/User.js';
 import Counter from '../models/Counter.js';
 import { sendEmail, templates } from '../services/emailService.js';
+import { uploadFile } from '../services/gdriveService.js'; // Import gdriveService
 
 async function nextPaperId() {
   const year = new Date().getFullYear().toString().slice(-2);
@@ -25,16 +26,20 @@ export async function submitPaper(req, res, next) {
     const authorId = req.user.id;
     const paperId = await nextPaperId();
 
+    // Upload file to Google Drive
+    const fileMetadata = await uploadFile(req.file.buffer, req.file.originalname, req.file.mimetype);
+    const gDriveFileId = fileMetadata.id; // Assuming uploadFile returns an object with an 'id' property
+
     const paper = await Paper.create({
       paperId,
       title,
       abstract,
       author: authorId,
       status: 'Submitted',
-      filePath: req.file.path,
+      filePath: gDriveFileId, // Store Google Drive File ID
       versions: [{
         version: 1,
-        filePath: req.file.path,
+        filePath: gDriveFileId, // Store Google Drive File ID
         submittedAt: new Date(),
       }],
     });
@@ -67,12 +72,16 @@ export async function resubmitPaper(req, res, next) {
 
     const nextVersion = (paper.versions.length || 0) + 1;
     
+    // Upload revised file to Google Drive
+    const fileMetadata = await uploadFile(req.file.buffer, req.file.originalname, req.file.mimetype);
+    const gDriveFileId = fileMetadata.id; // Assuming uploadFile returns an object with an 'id' property
+
     paper.versions.push({ 
       version: nextVersion, 
-      filePath: req.file.path, 
+      filePath: gDriveFileId, // Store Google Drive File ID
       submittedAt: new Date() 
     });
-    paper.filePath = req.file.path;
+    paper.filePath = gDriveFileId; // Update current filePath to new GDrive File ID
     paper.status = 'Revised Submitted';
     await paper.save();
 
