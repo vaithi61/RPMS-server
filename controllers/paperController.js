@@ -3,7 +3,6 @@ import Paper from '../models/Paper.js';
 import User from '../models/User.js';
 import Counter from '../models/Counter.js';
 import { sendEmail, templates } from '../services/emailService.js';
-import { uploadToDrive } from '../services/gdriveService.js'; // Import uploadToDrive
 
 async function nextPaperId() {
   const year = new Date().getFullYear().toString().slice(-2);
@@ -26,24 +25,16 @@ export async function submitPaper(req, res, next) {
     const authorId = req.user.id;
     const paperId = await nextPaperId();
 
-    // Upload file to Google Drive
-    const fileMetadata = await uploadToDrive({ 
-      name: req.file.originalname, 
-      mimeType: req.file.mimetype, 
-      body: req.file.buffer 
-    });
-    const gDriveFileId = fileMetadata.id; // Assuming uploadToDrive returns an object with an 'id' property
-
     const paper = await Paper.create({
       paperId,
       title,
       abstract,
       author: authorId,
       status: 'Submitted',
-      filePath: gDriveFileId, // Store Google Drive File ID
+      filePath: req.file.path,
       versions: [{
         version: 1,
-        filePath: gDriveFileId, // Store Google Drive File ID
+        filePath: req.file.path,
         submittedAt: new Date(),
       }],
     });
@@ -76,20 +67,12 @@ export async function resubmitPaper(req, res, next) {
 
     const nextVersion = (paper.versions.length || 0) + 1;
     
-    // Upload revised file to Google Drive
-    const fileMetadata = await uploadToDrive({ 
-      name: req.file.originalname, 
-      mimeType: req.file.mimetype, 
-      body: req.file.buffer 
-    });
-    const gDriveFileId = fileMetadata.id; // Assuming uploadToDrive returns an object with an 'id' property
-
     paper.versions.push({ 
       version: nextVersion, 
-      filePath: gDriveFileId, // Store Google Drive File ID
+      filePath: req.file.path, 
       submittedAt: new Date() 
     });
-    paper.filePath = gDriveFileId; // Update current filePath to new GDrive File ID
+    paper.filePath = req.file.path;
     paper.status = 'Revised Submitted';
     await paper.save();
 
@@ -166,5 +149,3 @@ export async function getPaperHistory(req, res, next) {
     });
   } catch (err) { next(err); }
 }
-
-// (duplicate block removed)
