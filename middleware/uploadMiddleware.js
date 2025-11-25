@@ -11,13 +11,22 @@ cloudinary.config({
 
 const createStorage = (folder) => new CloudinaryStorage({
   cloudinary: cloudinary,
-  params: {
-    folder: `paper-management/${folder}`, // Optional: organize uploads in a specific folder in Cloudinary
-    format: async (req, file) => {
-      const parts = file.originalname.split('.');
-      return parts[parts.length - 1]; // Use the actual file extension
-    },
-    public_id: (req, file) => `${folder}-${Date.now()}-${file.originalname.split('.')[0]}`,
+  params: async (req, file) => {
+    const parts = file.originalname.split('.');
+    const extension = parts[parts.length - 1]; // Use the actual file extension
+    let resourceType = 'raw'; // Default to raw for documents
+
+    // For payment proofs, allow image type if it's an image
+    if (folder === 'payments' && (file.mimetype.startsWith('image/') || file.mimetype === 'application/pdf')) {
+      resourceType = 'auto'; // Let Cloudinary auto-detect for images/PDFs in payments
+    }
+
+    return {
+      folder: `paper-management/${folder}`, // Optional: organize uploads in a specific folder in Cloudinary
+      format: extension,
+      public_id: `${folder}-${Date.now()}-${parts[0]}`,
+      resource_type: resourceType,
+    };
   },
 });
 
