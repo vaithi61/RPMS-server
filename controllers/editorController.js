@@ -96,10 +96,10 @@ export const makeFinalDecision = async (req, res) => {
     await paper.save();
 
     // Notify author and reviewers
-    sendEmail(paper.author.email, `Decision on Paper ${paper.paperId}`, `The final decision on your paper is: ${decision}.`);
+    sendEmail({ to: paper.author.email, subject: `Decision on Paper ${paper.paperId}`, html: `The final decision on your paper is: ${decision}.` });
     const reviewers = await User.find({ _id: { $in: paper.assignedReviewers } });
     reviewers.forEach(reviewer => {
-      sendEmail(reviewer.email, `Decision on Paper ${paper.paperId}`, `The final decision on paper ${paper.paperId} has been made.`);
+      sendEmail({ to: reviewer.email, subject: `Decision on Paper ${paper.paperId}`, html: `The final decision on paper ${paper.paperId} has been made.` });
     });
 
     res.status(200).json({ message: 'Final decision recorded successfully' });

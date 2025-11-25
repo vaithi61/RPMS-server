@@ -5,36 +5,46 @@ import { sendEmail } from '../services/emailService.js';
 // Upload final formatted file
 export const uploadFinalFile = async (req, res) => {
   try {
+    console.log('=== UPLOAD FINAL FILE DEBUG ===');
+    console.log('req.params.paperId:', req.params.paperId);
+    console.log('req.file:', req.file);
+
     const { paperId } = req.params;
+
+    if (!req.file) {
+      return res.status(400).json({ message: 'Final file is required' });
+    }
+
     const paper = await Paper.findById(paperId).populate('author');
     if (!paper) {
       return res.status(404).json({ message: 'Paper not found' });
     }
 
+    // Use secure_url from Cloudinary, fallback to path
+    const finalFileUrl = req.file.secure_url || req.file.path;
+    console.log('Final file URL:', finalFileUrl);
+
+    if (!finalFileUrl) {
+      return res.status(500).json({ message: 'File upload failed - no URL generated' });
+    }
+
     // Update the Paper document with the final file path
-    paper.finalFilePath = req.file.path;
-    paper.status = 'Awaiting Proof'; // Set status to Awaiting Proof after final file upload
-    console.log('Setting paper.finalFilePath to:', paper.finalFilePath); // Log before saving
+    paper.finalFilePath = finalFileUrl;
+    paper.status = 'Proof Approved';
+    console.log('Setting paper.finalFilePath to:', paper.finalFilePath);
     await paper.save();
-    console.log('Paper saved with finalFilePath:', paper.finalFilePath); // Log after saving
+    console.log('Paper saved successfully with finalFilePath');
 
-    // Create a Production record (if needed, or integrate into Paper model)
-    // For now, we'll assume Production model is for tracking publication status
-    // and the finalFilePath is directly on the Paper model.
-    // If a separate Production document is still desired for other reasons,
-    // its creation logic would go here.
-    // const production = new Production({
-    //   paperId,
-    //   finalFilePath: req.file.path, // This would be redundant if on Paper model
-    // });
-    // await production.save();
+    // Notify author
+    await sendEmail({
+      to: paper.author.email,
+      subject: `Paper ${paper.paperId} in Production`,
+      html: `<p>Your paper <strong>${paper.paperId}</strong> is now in the production stage.</p>`
+    });
 
-    // Notify author and admin
-    sendEmail(paper.author.email, `Paper ${paper.paperId} in Production`, 'Your paper is now in the production stage.');
-    // sendEmail(adminEmail, `Production Started for ${paper.paperId}`, `Production has started for paper ${paper.paperId}.`);
-
-    res.status(200).json({ message: 'Final file uploaded successfully' });
+    res.status(200).json({ message: 'Final file uploaded successfully', paper });
   } catch (error) {
+    console.error('Upload final file error:', error);
     res.status(500).json({ message: 'Error uploading final file', error: error.message });
   }
 };
@@ -43,30 +53,27 @@ export const uploadFinalFile = async (req, res) => {
 export const updatePublicationStatus = async (req, res) => {
   try {
     const { productionId, status } = req.body;
-    const production = await Production.findById(productionId).populate({
-      path: 'paperId',
-      populate: { path: 'author' }
-    });
-    if (!production) {
-      return res.status(404).json({ message: 'Production record not found' });
+
+    // productionId is actually the paperId from frontend
+    const paper = await Paper.findById(productionId).populate('author');
+    if (!paper) {
+      return res.status(404).json({ message: 'Paper not found' });
     }
 
-    production.status = status;
-    if (status === 'Published') {
-      production.publicationDate = Date.now();
-    }
-    await production.save();
-
-    const paper = await Paper.findById(production.paperId._id);
     paper.status = status;
     await paper.save();
 
     if (status === 'Published') {
-      sendEmail(production.paperId.author.email, `Paper ${paper.paperId} Published`, 'Congratulations! Your paper has been published.');
+      await sendEmail({
+        to: paper.author.email,
+        subject: `Paper ${paper.paperId} Published`,
+        html: `<p>Congratulations! Your paper <strong>${paper.paperId}</strong> has been published.</p>`
+      });
     }
 
-    res.status(200).json({ message: 'Publication status updated successfully' });
+    res.status(200).json({ message: 'Publication status updated successfully', paper });
   } catch (error) {
+    console.error('Update publication status error:', error);
     res.status(500).json({ message: 'Error updating publication status', error: error.message });
   }
 };

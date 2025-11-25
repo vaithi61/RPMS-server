@@ -11,7 +11,7 @@ router.post('/', protect, isAuthor, uploadPaper.single('paper'), submitPaper);
 router.get('/', protect, listPapers);
 
 // POST /api/papers/:id/resubmit -> author resubmits revised file
-router.post('/:id/resubmit', protect, isAuthor, uploadRevision.single('revision'), resubmitPaper);
+router.post('/:id/resubmit', protect, isAuthor, uploadRevision.single('file'), resubmitPaper);
 
 // GET /api/papers/:id/history -> history (access enforced in controller)
 router.get('/:id/history', protect, getPaperHistory);

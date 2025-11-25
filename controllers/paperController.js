@@ -25,16 +25,19 @@ export async function submitPaper(req, res, next) {
     const authorId = req.user.id;
     const paperId = await nextPaperId();
 
+    // Use secure_url from Cloudinary, fallback to path if not available
+    const fileUrl = req.file.secure_url || req.file.path;
+
     const paper = await Paper.create({
       paperId,
       title,
       abstract,
       author: authorId,
       status: 'Submitted',
-      filePath: req.file.secure_url, // Store Cloudinary URL
+      filePath: fileUrl,
       versions: [{
         version: 1,
-        filePath: req.file.secure_url, // Store Cloudinary URL
+        filePath: fileUrl,
         submittedAt: new Date(),
       }],
     });
@@ -48,12 +51,15 @@ export async function submitPaper(req, res, next) {
     }
 
     return res.status(201).json({ message: 'Paper submitted', paper });
-  } catch (err) { next(err); }
+  } catch (err) {
+    console.error('Submit paper error:', err);
+    next(err);
+  }
 }
 
 export async function resubmitPaper(req, res, next) {
   try {
-    const { id } = req.params; // paperId or _id
+    const { id } = req.params;
     if (!req.file) return res.status(400).json({ message: 'File is required' });
     const query = mongoose.isValidObjectId(id) ? { _id: id } : { paperId: id };
     const paper = await Paper.findOne(query).populate('author');
@@ -66,17 +72,16 @@ export async function resubmitPaper(req, res, next) {
     }
 
     const nextVersion = (paper.versions.length || 0) + 1;
-    
-    paper.versions.push({ 
-      version: nextVersion, 
-      filePath: req.file.secure_url, // Store Cloudinary URL
-      submittedAt: new Date() 
+    const fileUrl = req.file.secure_url || req.file.path;
+
+    paper.versions.push({
+      version: nextVersion,
+      filePath: fileUrl,
+      submittedAt: new Date()
     });
-    paper.filePath = req.file.secure_url; // Store Cloudinary URL
+    paper.filePath = fileUrl;
     paper.status = 'Revised Submitted';
     await paper.save();
-
-    const adminEmail = process.env.ADMIN_NOTIFY_EMAIL || process.env.SMTP_USER;
 
     return res.json({ message: 'Revision submitted', paper });
   } catch (err) { next(err); }
@@ -91,7 +96,6 @@ export async function listPapers(req, res, next) {
     } else if (user.role === 'Reviewer') {
       query.assignedReviewers = new mongoose.Types.ObjectId(user.id);
     } else if (user.role === 'Editor') {
-      // Editors should only see papers assigned to them
       query.editor = new mongoose.Types.ObjectId(user.id);
     }
 
@@ -99,7 +103,6 @@ export async function listPapers(req, res, next) {
     if (typeof status === 'string' && status.length > 0 && status !== 'All') {
       query.status = status;
     } else if (user.role === 'Reviewer' && status !== 'All') {
-      // Default reviewer view (when not explicitly asking for All): only active papers
       query.status = { $nin: ['Accepted', 'Rejected'] };
     }
     if (reviewer && user.role === 'Admin') {
@@ -115,7 +118,7 @@ export async function listPapers(req, res, next) {
     const papers = await Paper.find(query)
       .populate('author', 'email role name')
       .populate('assignedReviewers', 'email role name')
-      .select('+finalFilePath') // Explicitly select finalFilePath
+      .select('+finalFilePath')
       .sort({ createdAt: -1 });
     return res.json({ papers });
   } catch (err) { next(err); }
@@ -130,12 +133,11 @@ export async function getPaperHistory(req, res, next) {
       .populate('assignedReviewers', 'email name role');
     if (!paper) return res.status(404).json({ message: 'Paper not found' });
 
-    // Access: Admin, Author (owner), assigned Reviewer, or assigned Editor
     const user = req.user;
     const isAdmin = user.role === 'Admin';
     const isAuthor = paper.author?._id?.toString?.() === user.id;
-    const isReviewer = (paper.assignedReviewers || []).map(r=> r._id?.toString?.()).includes(user.id);
-    const isEditor = paper.editor?._id?.toString?.() === user.id; // Check if the current user is the assigned editor
+    const isReviewer = (paper.assignedReviewers || []).map(r => r._id?.toString?.()).includes(user.id);
+    const isEditor = paper.editor?._id?.toString?.() === user.id;
 
     if (!(isAdmin || isAuthor || isReviewer || isEditor)) return res.status(403).json({ message: 'Forbidden' });
     return res.json({
