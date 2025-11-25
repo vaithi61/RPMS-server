@@ -115,7 +115,7 @@ export async function listPapers(req, res, next) {
     const papers = await Paper.find(query)
       .populate('author', 'email role name')
       .populate('assignedReviewers', 'email role name')
-      .select('+finalFilePath') // Explicitly select finalFilePath
+      .select('+finalFilePath filePath versions.filePath') // Explicitly select finalFilePath and filePath
       .sort({ createdAt: -1 });
     return res.json({ papers });
   } catch (err) { next(err); }
@@ -143,7 +143,11 @@ export async function getPaperHistory(req, res, next) {
       title: paper.title,
       status: paper.status,
       currentVersion: paper.currentVersion,
-      versions: paper.versions || [],
+      versions: (paper.versions || []).map(v => ({ // Ensure filePath is included in versions
+        version: v.version,
+        filePath: v.filePath,
+        submittedAt: v.submittedAt,
+      })),
       author: paper.author,
       assignedReviewers: paper.assignedReviewers,
     });
