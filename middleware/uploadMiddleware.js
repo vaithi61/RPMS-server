@@ -14,8 +14,8 @@ const createStorage = (folder) => new CloudinaryStorage({
   params: {
     folder: `paper-management/${folder}`, // Optional: organize uploads in a specific folder in Cloudinary
     format: async (req, file) => {
-      const extension = file.mimetype.split('/')[1];
-      return extension;
+      const parts = file.originalname.split('.');
+      return parts[parts.length - 1]; // Use the actual file extension
     },
     public_id: (req, file) => `${folder}-${Date.now()}-${file.originalname.split('.')[0]}`,
   },
