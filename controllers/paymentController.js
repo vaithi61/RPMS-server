@@ -25,7 +25,7 @@ export const submitPayment = async (req, res) => {
       amount,
       method,
       transactionId,
-      proofFile: req.file.path,
+      proofFile: req.file.secure_url, // Store Cloudinary URL
     });
     console.log('Payment document created:', payment);
     await payment.save();

@@ -1,12 +1,23 @@
 import multer from 'multer';
-import path from 'path';
+import { v2 as cloudinary } from 'cloudinary';
+import { CloudinaryStorage } from 'multer-storage-cloudinary';
+import 'dotenv/config'; // Ensure dotenv is loaded
 
-const createStorage = (folder) => multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, `uploads/${folder}/`);
-  },
-  filename: (req, file, cb) => {
-    cb(null, `${Date.now()}-${file.originalname}`);
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+const createStorage = (folder) => new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: `paper-management/${folder}`, // Optional: organize uploads in a specific folder in Cloudinary
+    format: async (req, file) => {
+      const extension = file.mimetype.split('/')[1];
+      return extension;
+    },
+    public_id: (req, file) => `${folder}-${Date.now()}-${file.originalname.split('.')[0]}`,
   },
 });
 

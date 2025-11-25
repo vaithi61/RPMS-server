@@ -31,10 +31,10 @@ export async function submitPaper(req, res, next) {
       abstract,
       author: authorId,
       status: 'Submitted',
-      filePath: req.file.path,
+      filePath: req.file.secure_url, // Store Cloudinary URL
       versions: [{
         version: 1,
-        filePath: req.file.path,
+        filePath: req.file.secure_url, // Store Cloudinary URL
         submittedAt: new Date(),
       }],
     });
@@ -69,10 +69,10 @@ export async function resubmitPaper(req, res, next) {
     
     paper.versions.push({ 
       version: nextVersion, 
-      filePath: req.file.path, 
+      filePath: req.file.secure_url, // Store Cloudinary URL
       submittedAt: new Date() 
     });
-    paper.filePath = req.file.path;
+    paper.filePath = req.file.secure_url; // Store Cloudinary URL
     paper.status = 'Revised Submitted';
     await paper.save();
 

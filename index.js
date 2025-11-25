@@ -15,12 +15,6 @@ import editorRoutes from './routes/editorRoutes.js';
 import productionRoutes from './routes/productionRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
 import { notFoundHandler, errorHandler } from './middleware/errorHandler.js';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 const app = express();
 
 // Security & utility middlewares
@@ -55,9 +49,6 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/editor', editorRoutes);
 app.use('/api/production', productionRoutes);
 app.use('/api/payments', paymentRoutes);
-
-// Serve uploaded files
-app.use('/uploads', express.static(path.join(__dirname, '/uploads')));
 
 // 404 and Error handlers
 app.use(notFoundHandler);
