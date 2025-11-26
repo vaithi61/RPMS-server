@@ -52,7 +52,7 @@ export const uploadReview = multer({
 
 export const uploadRevision = multer({
   storage: createStorage('revisions'),
-  fileFilter: createFileFilter(['application/pdf']),
+  fileFilter: createFileFilter(['application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']),
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
 });
 
@@ -64,6 +64,6 @@ export const uploadPaymentProof = multer({
 
 export const uploadFinalFile = multer({
   storage: createStorage('final'),
-  fileFilter: createFileFilter(['application/pdf']),
+  fileFilter: createFileFilter(['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']),
   limits: { fileSize: 15 * 1024 * 1024 }, // 15MB
 });

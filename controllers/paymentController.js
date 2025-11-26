@@ -1,4 +1,4 @@
-import mongoose from 'mongoose'; // Import mongoose
+import mongoose from 'mongoose';
 import Payment from '../models/Payment.js';
 import Paper from '../models/Paper.js';
 import { sendEmail } from '../services/emailService.js';
@@ -6,36 +6,48 @@ import { sendEmail } from '../services/emailService.js';
 // Submit payment proof
 export const submitPayment = async (req, res) => {
   try {
+    console.log('=== PAYMENT SUBMISSION DEBUG ===');
     console.log('req.body:', req.body);
     console.log('req.file:', req.file);
-    console.log('req.user:', req.user); // Log req.user
+    console.log('req.user:', req.user);
 
     const { paperId, method, transactionId } = req.body;
-    const amount = parseFloat(req.body.amount); // Explicitly convert amount to a number
+    const amount = parseFloat(req.body.amount);
 
-    const paper = await Paper.findOne({ paperId: paperId }); // Find paper by its custom paperId string
+    if (!req.file) {
+      return res.status(400).json({ message: 'Payment proof file is required' });
+    }
+
+    // paperId from frontend is actually the MongoDB _id
+    const paper = await Paper.findById(paperId);
     if (!paper) {
       return res.status(404).json({ message: 'Paper not found' });
     }
 
+    // Use secure_url from Cloudinary, fallback to path
+    const proofFileUrl = req.file.secure_url || req.file.path;
+    console.log('Proof file URL:', proofFileUrl);
+
+    if (!proofFileUrl) {
+      return res.status(500).json({ message: 'File upload failed - no URL generated' });
+    }
+
     console.log('Creating new Payment document...');
     const payment = new Payment({
-      paperId: paper._id, // Use the MongoDB _id of the found paper
+      paperId: paper._id,
       authorId: req.user._id,
       amount,
       method,
       transactionId,
-      proofFile: req.file.secure_url, // Store Cloudinary URL
+      proofFile: proofFileUrl,
     });
     console.log('Payment document created:', payment);
     await payment.save();
-    console.log('Payment document saved.');
+    console.log('Payment document saved successfully');
 
-    // Notify admin
-    // sendEmail(adminEmail, 'Payment Proof Submitted', `Payment proof has been submitted for paper ${paper.paperId}.`);
-
-    res.status(201).json({ message: 'Payment submitted successfully' });
+    res.status(201).json({ message: 'Payment submitted successfully', payment });
   } catch (error) {
+    console.error('Payment submission error:', error);
     res.status(500).json({ message: 'Error submitting payment', error: error.message });
   }
 };
@@ -44,7 +56,7 @@ export const submitPayment = async (req, res) => {
 export const updatePaymentStatus = async (req, res) => {
   try {
     const { paymentId } = req.params;
-    const { status, reason } = req.body; // 'Verified' or 'Rejected', and reason for rejection
+    const { status, reason } = req.body;
 
     const payment = await Payment.findById(paymentId).populate({
       path: 'paperId',
@@ -58,7 +70,7 @@ export const updatePaymentStatus = async (req, res) => {
     if (status === 'Rejected') {
       payment.rejectionReason = reason;
     } else {
-      payment.rejectionReason = undefined; // Clear reason if not rejected
+      payment.rejectionReason = undefined;
     }
     await payment.save();
 
@@ -66,7 +78,7 @@ export const updatePaymentStatus = async (req, res) => {
     if (status === 'Verified') {
       const paper = await Paper.findById(payment.paperId._id);
       if (paper) {
-        paper.status = 'Awaiting Proof'; // Or 'Production Ready' depending on workflow
+        paper.status = 'Proof Approved';
         await paper.save();
       }
       // Notify author of verification
@@ -88,13 +100,13 @@ export const listAllPayments = async (req, res) => {
     const payments = await Payment.find({})
       .populate({
         path: 'paperId',
-        select: 'paperId title', // Select specific fields from Paper
+        select: 'paperId title',
       })
       .populate({
         path: 'authorId',
-        select: 'email name', // Select specific fields from User
+        select: 'email name',
       })
-      .sort({ createdAt: -1 }); // Sort by most recent
+      .sort({ createdAt: -1 });
 
     res.status(200).json(payments);
   } catch (error) {
@@ -109,9 +121,9 @@ export const listPaymentsByAuthor = async (req, res) => {
     const payments = await Payment.find({ authorId })
       .populate({
         path: 'paperId',
-        select: 'paperId title status', // Select specific fields from Paper
+        select: 'paperId title status',
       })
-      .sort({ createdAt: -1 }); // Sort by most recent
+      .sort({ createdAt: -1 });
 
     res.status(200).json(payments);
   } catch (error) {
